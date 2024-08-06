@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <string.h>
 
 #define IWC_MEM_IMPLEMENTATION
 #define IWC_WARN(s) fprintf(stderr, "%s\n", s)
@@ -16,6 +17,10 @@
     clock_t duration = clock() - start;\
     if (success) {\
         printf("SUCCESS (%fs)\n", (float)duration / CLOCKS_PER_SEC);\
+        if (verbose) {\
+            fflush(log);\
+            printf("%s\n", logStr);\
+        }\
     } else {\
         fflush(log);\
         printf("FAIL:\n%s\n", logStr);\
@@ -67,7 +72,36 @@ bool stackBufferAllocator(FILE* log) {
     return genericAllocFreeTest(log, a);
 }
 
-int main() {
+bool sbaAlignment(FILE* log) {
+    uint8_t buf[64];
+    uint8_t* malalignedBuf = buf+3;
+
+    fprintf(log, "buf: %p\n", buf);
+    fprintf(log, "malalignedBuf: %p\n", malalignedBuf);
+
+    iwc_Allocator a;
+    if (!iwc_initStackBufferAllocator(&a, buf, 61)) return false;
+
+    uint64_t* pleaseAlignMe = iwc_alloc(a, sizeof(uint64_t));
+    fprintf(log, "pleaseAlignMe: %p\n", pleaseAlignMe);
+
+    if ((size_t)pleaseAlignMe % sizeof(uint64_t) != 0) return false;
+
+    iwc_free(a, pleaseAlignMe, sizeof(uint64_t));
+
+    return true;
+}
+
+int main(int argc, char** argv) {
+    bool verbose = false;
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-v")
+        ||  !strcmp(argv[i], "--verbose")) {
+            verbose = true;
+        }
+    }
+
     RUNTEST(cAllocator);
     RUNTEST(stackBufferAllocator);
+    RUNTEST(sbaAlignment);
 }

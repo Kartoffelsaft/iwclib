@@ -9,6 +9,10 @@
 #define IWC_WARN(s) (void)(s)
 #endif // IWC_WARN
 
+#ifndef IWC_ALIGNMENT
+#define IWC_ALIGNMENT 8
+#endif // IWC_ALIGNMENT
+
 /**
  * Specifies which memory operation to do
  * @see iwc_MemFn
@@ -181,8 +185,8 @@ typedef struct {
 
 bool iwc__stackBufferAllocOp(void* info, iwc_MemOperator op, void** ptr, size_t oldSize, size_t newSize) {
     iwc__StackBufferAllocInfo* a = (iwc__StackBufferAllocInfo*)info;
-    size_t osAligned = ((oldSize-1)/8 + 1)*8;
-    size_t nsAligned = ((newSize-1)/8 + 1)*8;
+    size_t osAligned = ((oldSize-1)/IWC_ALIGNMENT + 1)*IWC_ALIGNMENT;
+    size_t nsAligned = ((newSize-1)/IWC_ALIGNMENT + 1)*IWC_ALIGNMENT;
 
     uint8_t** bptr = (uint8_t**)ptr;
 
@@ -203,13 +207,14 @@ bool iwc__stackBufferAllocOp(void* info, iwc_MemOperator op, void** ptr, size_t 
                 return true;
             } else {
                 return false;
+                IWC_WARN("WARNING: stack buffer allocator can only free last alloc");
             }
             break;
         case IWC_REALLOC:
             if (*bptr + osAligned == a->head) {
-                // TODO: doesn't check if there's enough space but I am lazy right now
                 if (*bptr + nsAligned > a->buf + a->bufsize) {
                     IWC_WARN("WARNING: stack buffer allocator does not have enough memory");
+                    return false;
                 } else {
                     a->head = *bptr + nsAligned;
                     return true;
@@ -231,8 +236,8 @@ bool iwc__stackBufferAllocOp(void* info, iwc_MemOperator op, void** ptr, size_t 
 bool iwc_initStackBufferAllocator(iwc_Allocator* out, void* buf, size_t size) {
     if (size <= sizeof(iwc__StackBufferAllocInfo)) return false;
     iwc__StackBufferAllocInfo* sai = (iwc__StackBufferAllocInfo*) buf;
-    uint8_t* remBuf = (uint8_t*)buf + ((sizeof(iwc__StackBufferAllocInfo)-1)/8 + 1)*8;
-    size_t remSize = size - ((sizeof(iwc__StackBufferAllocInfo)-1)/8 + 1)*8;
+    uint8_t* remBuf = (uint8_t*)buf + ((sizeof(iwc__StackBufferAllocInfo)-1)/IWC_ALIGNMENT + 1)*IWC_ALIGNMENT;
+    size_t remSize = size - ((sizeof(iwc__StackBufferAllocInfo)-1)/IWC_ALIGNMENT + 1)*IWC_ALIGNMENT;
 
     *sai = (iwc__StackBufferAllocInfo){0};
     sai->buf = remBuf;
